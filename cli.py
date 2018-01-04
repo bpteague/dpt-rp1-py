@@ -11,10 +11,35 @@ def do_screenshot(d, filename):
     with open(filename, 'wb') as f:
         f.write(pic)
 
+# def do_status(d):
+#     print(d.status())
+# 
+# def do_test_mode(d):
+#     print(d.test_mode())
+
 def do_list_documents(d):
     data = d.list_documents()
     for d in data:
-        print(d['entry_path'])
+        if d['entry_type'] != 'folder':
+            print(d['entry_path'])
+
+def do_list_folders(d):
+    data = d.list_documents()
+    for d in data:
+        if d['entry_type'] == 'folder':
+            print(d['entry_path'])
+
+def do_list_templates(d):
+    data = d.list_templates()
+    for d in data:
+        print(d['template_name'])
+
+def do_upload_template(d, local_path, template_name):
+    with open(local_path, 'rb') as f:
+        d.upload_template(f, template_name)
+
+def do_delete_template(d, template_name):
+    d.delete_template(template_name)
 
 def do_upload(d, local_path, remote_path):
     with open(local_path, 'rb') as fh:
@@ -25,6 +50,9 @@ def do_download(d, remote_path, local_path):
 
     with open(local_path, 'wb') as f:
         f.write(data)
+
+def do_delete(d, remote_path):
+    print(d.delete(remote_path))
 
 def do_new_folder(d, remote_path):
     d.new_folder(remote_path)
@@ -68,11 +96,17 @@ if __name__ == "__main__":
 
     commands = {
         "screenshot": do_screenshot,
+        #"status": do_status,
+        #"testmode": do_test_mode,
         "list-documents" : do_list_documents,
+        "list-folders" : do_list_folders,
+        "list-templates" : do_list_templates,
+        "upload-template" : do_upload_template,
+        "delete-template" : do_delete_template,
         "upload" : do_upload,
         "download" : do_download,
+        "delete" : do_delete,
         "new-folder" : do_new_folder,
-#        "list-folders" : do_list_folders,
         "wifi-list": do_wifi_list,
         "wifi-scan": do_wifi_scan,
         "wifi-add": do_add_wifi,
