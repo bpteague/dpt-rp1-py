@@ -104,7 +104,8 @@ class GUITask(Task):
             error(None, "Other error connecting to DPT-RP1: {}".format(str(e)))
             
         files = []
-        folders = [Folder(entry_id = "root")]
+        folders = [Folder(entry_id = "root",
+                          entry_name = "Document")]
             
         docs = self.dp.list_documents()
         for d in docs:
