@@ -20,7 +20,7 @@ from pyface.api import error, ConfirmationDialog, FileDialog, \
 from traits.api import on_trait_change, Instance
 
 from dptrp1.gui.gui_panes import DPTPane
-from dptrp1.gui.dpt_model import DPTModel
+from dptrp1.gui.dpt_model import DPTModel, File, Folder
 from dptrp1.api import DigitalPaper
 
 # Local imports.
@@ -37,7 +37,7 @@ class GUITask(Task):
     name = 'DPT-RP1 GUI'
     
     dp = Instance(DigitalPaper)
-    dpt_model = Instance(DPTModel, ())
+    model = Instance(DPTModel, ())
 
     #default_layout = TaskLayout(
     #    left=PaneItem('example.python_script_browser_pane'))
@@ -74,7 +74,7 @@ class GUITask(Task):
     def create_central_pane(self):
         """ Create the central pane: the script editor.
         """
-        return DPTPane(model = self.dpt_model)
+        return DPTPane(model = self.model)
 
 #     def create_dock_panes(self):
 #         """ Create the file browser and connect to its double click event.
@@ -102,6 +102,35 @@ class GUITask(Task):
             error(None, "Error authenticating with DPT-RP1 at {}: {}".format(addr, str(e)))
         except Exception as e:
             error(None, "Other error connecting to DPT-RP1: {}".format(str(e)))
+            
+        files = []
+        folders = [Folder(entry_id = "root")]
+            
+        docs = self.dp.list_documents()
+        for d in docs:
+            if d['entry_type'] == 'folder':
+                f = Folder(**d)
+                folders.append(f)
+            else:
+                f = File(**d)
+                files.append(f)
+                
+        for file in files:
+            folder = next(f for f in folders if f.entry_id == file.parent_folder_id)
+            folder.files.append(file)
+            file.parent_folder = folder
+            
+        for folder in folders:
+            if folder.entry_id == 'root':
+                continue
+            parent_folder = next(f for f in folders if f.entry_id == folder.parent_folder_id)
+            parent_folder.files.append(folder)
+            folder.parent_folder = parent_folder
+            
+        self.model.root = folders[0]
+                
+        
+                
             
         
 #         """ Shows a dialog to open a file.
