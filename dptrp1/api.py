@@ -5,15 +5,17 @@ import urllib3
 from urllib.parse import quote_plus
 import os
 import base64
-from pyDH import DiffieHellman
 from pbkdf2 import PBKDF2
 from Crypto.Hash import SHA256 
 from Crypto.Hash.HMAC import HMAC
 from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 import uuid
+import logging
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+from dptrp1.pyDH import DiffieHellman
 
 class DigitalPaper():
     def __init__(self, addr = None):
@@ -36,7 +38,7 @@ class DigitalPaper():
 
     ### Authentication
 
-    def register(self):
+    def register(self, callback = None):
         """
         Gets authentication info from a DPT-RP1.  You can call this BEFORE
         DigitalPaper.authenticate()
@@ -55,7 +57,7 @@ class DigitalPaper():
         register_url = '{base_url}/register'.format(base_url = reg_url)
         register_cleanup_url = '{base_url}/register/cleanup'.format(base_url = reg_url)
         try:
-            print("Requesting PIN...")
+            logging.debug("Requesting PIN...")
             r = requests.post(register_pin_url, verify = False)
             r.raise_for_status()
             m1 = r.json()
@@ -93,14 +95,14 @@ class DigitalPaper():
                       e = base64.b64encode(m2hmac).decode('utf-8'))
     
     
-            print("Encoding nonce...")
+            logging.debug("Encoding nonce...")
             r = requests.post(register_hash_url, json = m2)
             r.raise_for_status()
     
             m3 = r.json()
             
             if(base64.b64decode(m3['a']) != n2):
-                print("Nonce N2 doesn't match")
+                logging.error("Nonce N2 doesn't match")
                 return
     
             eHash = base64.b64decode(m3['b'])
@@ -108,10 +110,13 @@ class DigitalPaper():
             hmac = HMAC(authKey, digestmod = SHA256)
             hmac.update(n1 + n2 + mac + ya + m2hmac + n2 + eHash)
             if m3hmac != hmac.digest():
-                print("M3 HMAC doesn't match")
+                logging.error("M3 HMAC doesn't match")
                 return
     
-            pin = input("Please enter the PIN shown on the DPT-RP1: ")
+            if callback is not None:
+                pin = callback()
+            else:
+                pin = input("Please enter the PIN shown on the DPT-RP1: ")
     
             hmac = HMAC(authKey, digestmod = SHA256)
             hmac.update(pin.encode())
@@ -133,14 +138,14 @@ class DigitalPaper():
                       d = base64.b64encode(wrappedRs).decode('utf-8'),
                       e = base64.b64encode(m4hmac).decode('utf-8'))
     
-            print("Getting certificate from device CA...")
+            logging.debug("Getting certificate from device CA...")
             r = requests.post(register_ca_url, json = m4)
             r.raise_for_status()
     
             m5 = r.json()
     
             if(base64.b64decode(m5['a']) != n2):
-                print("Nonce N2 doesn't match")
+                logging.error("Nonce N2 doesn't match")
                 return
     
             wrappedEsCert = base64.b64decode(m5['d'])
@@ -149,7 +154,7 @@ class DigitalPaper():
             hmac = HMAC(authKey, digestmod = SHA256)
             hmac.update(n1 + rHash + wrappedRs + m4hmac + n2 + wrappedEsCert)
             if hmac.digest() != m5hmac:
-                print("HMAC doesn't match!")
+                logging.error("HMAC doesn't match!")
                 return
     
             esCert = unwrap(wrappedEsCert, authKey, keyWrapKey)
@@ -159,16 +164,16 @@ class DigitalPaper():
             hmac = HMAC(authKey, digestmod = SHA256)
             hmac.update(es + psk + yb + ya)
             if hmac.digest() != eHash:
-                print("eHash does not match!")
+                logging.error("eHash does not match!")
                 return
     
-            print("Generating RSA2048 keys")
+            logging.debug("Generating RSA2048 keys")
             new_key = RSA.generate(2048, e=65537)
     
             keyPubC = new_key.publickey().exportKey("PEM")
     
             selfDeviceId = str(uuid.uuid4())
-            print("Device ID: " + selfDeviceId)
+            logging.debug("Device ID: " + selfDeviceId)
             selfDeviceId = selfDeviceId.encode()
     
             wrappedDIDKPUBC = wrap(selfDeviceId + keyPubC, authKey, keyWrapKey)
@@ -181,7 +186,7 @@ class DigitalPaper():
                       d = base64.b64encode(wrappedDIDKPUBC).decode('utf-8'),
                       e = base64.b64encode(m6hmac).decode('utf-8'))
     
-            print("Registering device...")
+            logging.debug("Registering device...")
             r = requests.post(register_url, json = m6, verify = False)
             r.raise_for_status()
 
@@ -193,7 +198,7 @@ class DigitalPaper():
             raise e
 
         finally:
-            print("Cleaning up...")
+            logging.debug("Cleaning up...")
             r = requests.put(register_cleanup_url, verify = False)
             r.raise_for_status()
 
@@ -210,6 +215,11 @@ class DigitalPaper():
         r.raise_for_status()
         _, credentials = r.headers["Set-Cookie"].split("; ")[0].split("=")
         self.cookies["Credentials"] = credentials
+        
+    def device_information(self):
+        data = self._get_endpoint('/register/information').json()
+        return data
+        
 
     ### File management
 
@@ -310,7 +320,7 @@ class DigitalPaper():
                 break
 
         if template_id is None:
-            raise RuntimeException("Could not find a template named {}" \
+            raise RuntimeError("Could not find a template named {}" \
                     .format(template_name))
 
         url = '/viewer/configs/note_templates/{template_id}' \

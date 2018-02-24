@@ -4,8 +4,9 @@ import sys
 import json
 import os
 from datetime import datetime
+import logging
 
-from dptrp1 import DigitalPaper
+from dptrp1.api import DigitalPaper
 
 def do_screenshot(d, filename):
     pic = d.take_screenshot()
@@ -91,7 +92,11 @@ def do_delete_wifi(d):
     print(d.delete_wifi(ssid = "vecna2", security = "psk"))
 
 def do_register(d):
-    d.register()
+    cert, new_key, device_id = d.register()
+    
+def do_info(d):
+    print(d.device_information())
+    
 
 def do_sync_upload(d, local_folder, remote_folder):
     from pathlib import Path
@@ -188,6 +193,9 @@ def do_sync_download(d, remote_folder, local_folder):
 
 
 if __name__ == "__main__":
+    
+    logging.getLogger().setLevel(logging.DEBUG)
+
 
     commands = {
         "screenshot": do_screenshot,
@@ -210,6 +218,7 @@ if __name__ == "__main__":
         "wifi-enable" : do_wifi_enable,
         "wifi-disable" : do_wifi_disable,
         "register" : do_register,
+        "info" : do_info,
         "sync-up" : do_sync_upload,
         "sync-down" : do_sync_download
     }

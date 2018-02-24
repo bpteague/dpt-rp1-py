@@ -6,7 +6,6 @@
 
 import os
 import binascii
-import hashlib
 
 # RFC 3526 - More Modular Exponential (MODP) Diffie-Hellman groups for 
 # Internet Key Exchange (IKE) https://tools.ietf.org/html/rfc3526 
