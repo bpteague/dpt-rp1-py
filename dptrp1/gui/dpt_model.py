@@ -55,6 +55,15 @@ class Folder(HasTraits):
 DeleteAction = Action(name = 'Delete',
                       action = 'handler._delete_nodes(editor)')
 
+UploadAction = Action(name = 'Upload',
+                      action = 'handler._upload_files(editor)')
+
+DownloadAction = Action(name = 'Download',
+                        action = 'handler._download_files(editor)')
+
+SyncAction = Action(name = "Synchronize",
+                    action = 'handler._sync_folder(editor)')
+
 class DPTModel(HasTraits):
     root = Instance(Folder, ())
     
@@ -69,13 +78,17 @@ class DPTModel(HasTraits):
                                                  add = [Folder],
                                                  menu = Menu(NewAction,
                                                              DeleteAction,
-                                                             RenameAction) ),
+                                                             RenameAction,
+                                                             UploadAction,
+                                                             DownloadAction,
+                                                             SyncAction) ),
         
                                         TreeNode(node_for = [File],
                                                  label = 'entry_name',
                                                  view = View(),
                                                  menu = Menu(DeleteAction,
-                                                             RenameAction))],
+                                                             RenameAction,
+                                                             DownloadAction))],
                                     selection_mode = 'extended'),
                      show_label = False))
     

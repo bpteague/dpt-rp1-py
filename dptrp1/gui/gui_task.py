@@ -16,7 +16,7 @@ from pyface.tasks.api import Task, TaskLayout, PaneItem
 from pyface.tasks.action.api import DockPaneToggleGroup, SMenuBar, \
     SMenu, SToolBar, TaskAction
 from pyface.api import error, ConfirmationDialog, FileDialog, \
-    ImageResource, YES, OK, CANCEL
+    ImageResource, YES, OK, CANCEL, confirm
 from traits.api import on_trait_change, Instance
 from traitsui.api import Controller
 
@@ -134,11 +134,39 @@ class GUITask(Task, Controller):
         
     def _delete_nodes(self, editor):
         selected = editor.selected
+
+        if len(selected) == 1:
+            ret = confirm(
+                    None, 
+                    "Are you sure you want to delete {}?".format(selected.name),
+                    title = "Delete?",
+                    default = NO)
+            if ret == NO:
+                return
+
+        else:
+            parent = selected[0].parent_folder_id
+
+            for s in selected:
+                if isinstance(s, Folder):
+                    error(None, "Can only remove one folder at a time.")
+                    return
+
+                if s.parent_folder_id != top_parent:
+                    error(None, "Can only remove multiple documents in the same folder.")
+                    return
+
+            ret = confirm(None,
+                    "Are you sure you want to delete {} documents?"
+                    .format(len(selected)),
+                    title = "Delete?",
+                    default = NO)
+
+            if ret == NO:
+                return
+
         parent = selected[0].parent_folder
-        
-        # confirm
-        # TODO - check either a folder or all files in a single folder
-        
+
         for s in selected:
             # remove from device
             
@@ -146,6 +174,15 @@ class GUITask(Task, Controller):
             # TODO - handle folder
             parent.files.remove(s)
         
+        pass
+
+    def _upload_files(self, editor):
+        pass
+
+    def _download_files(self, editor):
+        pass
+
+    def _sync_folder(self, editor):
         pass
                 
             
