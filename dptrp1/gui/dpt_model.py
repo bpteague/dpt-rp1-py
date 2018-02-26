@@ -5,8 +5,9 @@ Created on Feb 24, 2018
 '''
 
 from traits.api import HasTraits, Str, List, CBool, CInt, Enum, Either, Instance, Property
-from traitsui.api import View, Item, TreeEditor, TreeNode, Menu
+from traitsui.api import View, Item, TreeEditor, TreeNode, Menu, Action
 from traitsui.qt4.tree_editor import NewAction, RenameAction, DeleteAction
+from pyface.tasks.action.api import TaskAction
 
 class File(HasTraits):
     name = Property
@@ -50,6 +51,9 @@ class Folder(HasTraits):
     
     def _get_name(self):
         return self.entry_name
+    
+DeleteAction = Action(name = 'Delete',
+                      action = 'handler._delete_nodes(editor)')
 
 class DPTModel(HasTraits):
     root = Instance(Folder, ())
@@ -71,5 +75,7 @@ class DPTModel(HasTraits):
                                                  label = 'entry_name',
                                                  view = View(),
                                                  menu = Menu(DeleteAction,
-                                                             RenameAction))]),
+                                                             RenameAction))],
+                                    selection_mode = 'extended'),
                      show_label = False))
+    

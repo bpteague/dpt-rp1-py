@@ -18,6 +18,7 @@ from pyface.tasks.action.api import DockPaneToggleGroup, SMenuBar, \
 from pyface.api import error, ConfirmationDialog, FileDialog, \
     ImageResource, YES, OK, CANCEL
 from traits.api import on_trait_change, Instance
+from traitsui.api import Controller
 
 from dptrp1.gui.gui_panes import DPTPane
 from dptrp1.gui.dpt_model import DPTModel, File, Folder
@@ -27,7 +28,7 @@ from dptrp1.api import DigitalPaper
 # from example_panes import PythonEditorPane, PythonScriptBrowserPane
 
 
-class GUITask(Task):
+class GUITask(Task, Controller):
     """ A simple task for editing Python code.
     """
 
@@ -131,6 +132,21 @@ class GUITask(Task):
         self.model.root = folders[0]
                 
         
+    def _delete_nodes(self, editor):
+        selected = editor.selected
+        parent = selected[0].parent_folder
+        
+        # confirm
+        # TODO - check either a folder or all files in a single folder
+        
+        for s in selected:
+            # remove from device
+            
+            # remove from model -- which removes it from the tree
+            # TODO - handle folder
+            parent.files.remove(s)
+        
+        pass
                 
             
         

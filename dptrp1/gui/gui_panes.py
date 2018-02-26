@@ -34,7 +34,8 @@ class DPTPane(TaskPane):
 
     def create(self, parent):
         self.control = self.model.edit_traits(kind = 'subpanel', 
-                                              parent = parent).control
+                                              parent = parent,
+                                              handler = self.task).control
 
     def destroy(self):
         self.control = None
