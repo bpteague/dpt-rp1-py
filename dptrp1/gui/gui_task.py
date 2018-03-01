@@ -16,7 +16,7 @@ from pyface.tasks.api import Task, TaskLayout, PaneItem
 from pyface.tasks.action.api import DockPaneToggleGroup, SMenuBar, \
     SMenu, SToolBar, TaskAction
 from pyface.api import error, ConfirmationDialog, FileDialog, \
-    ImageResource, YES, OK, CANCEL, confirm
+    ImageResource, YES, OK, NO, CANCEL, confirm
 from traits.api import on_trait_change, Instance
 from traitsui.api import Controller
 
@@ -138,7 +138,7 @@ class GUITask(Task, Controller):
         if len(selected) == 1:
             ret = confirm(
                     None, 
-                    "Are you sure you want to delete {}?".format(selected.name),
+                    "Are you sure you want to delete {}?".format(selected[0].name),
                     title = "Delete?",
                     default = NO)
             if ret == NO:
@@ -152,7 +152,7 @@ class GUITask(Task, Controller):
                     error(None, "Can only remove one folder at a time.")
                     return
 
-                if s.parent_folder_id != top_parent:
+                if s.parent_folder_id != parent:
                     error(None, "Can only remove multiple documents in the same folder.")
                     return
 
