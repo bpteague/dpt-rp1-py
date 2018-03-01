@@ -13,7 +13,7 @@ from Crypto.PublicKey import RSA
 import uuid
 import logging
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # @UndefinedVariable
 
 from dptrp1.pyDH import DiffieHellman
 
@@ -43,11 +43,11 @@ class DigitalPaper():
         Gets authentication info from a DPT-RP1.  You can call this BEFORE
         DigitalPaper.authenticate()
 
-        Returns (ca, priv_key, client_id):
-            - ca: a PEM-encoded X.509 server certificate, issued by the CA
+        Returns:
+            ca: a PEM-encoded X.509 server certificate, issued by the CA
                   on the device
-            - priv_key: a PEM-encoded 2048-bit RSA private key
-            - client_id: the client id
+            priv_key: a PEM-encoded 2048-bit RSA private key
+            client_id: the client id
         """
 
         reg_url = "http://{addr}:8080".format(addr = self.addr)
@@ -203,6 +203,14 @@ class DigitalPaper():
             r.raise_for_status()
 
     def authenticate(self, client_id, key):
+        """
+        Set up an authenticated session with a device.
+        
+        Args:
+            client_id (string): The client UUID
+            key (string): PEM-formated RSA private key
+        """
+        
         sig_maker = httpsig.Signer(secret=key, algorithm='rsa-sha256')
         nonce = self._get_nonce(client_id)
         signed_nonce = sig_maker._sign(nonce)
@@ -217,85 +225,204 @@ class DigitalPaper():
         self.cookies["Credentials"] = credentials
         
     def device_information(self):
+        """
+        Gets the device information (serial#, hardware revision, etc.)
+        
+        Returns:
+            dict: The document info.
+        """
+        
         data = self._get_endpoint('/register/information').json()
         return data
         
-
     ### File management
 
     def list_documents(self):
+        """
+        Gets a list of all of the documents (files and folders) on the device.
+        
+        Returns:
+            list of dict : Information for all the documents.
+        """
+        
         params = {
                 'entry_type' : 'all'
                 }
         data = self._get_endpoint('/documents2', params = params).json()
         return data['entry_list']
-
-    def download(self, remote_path):
+    
+    def get_document_info(self, document_id):
+        """
+        Gets the document info for a single document.
+        
+        Args:
+            document_id (int): The document id
+            
+        Returns:
+            dict: A dictionary with the document info
+        """
+        
+        url = '/documents2/{document_id}'.format(document_id = document_id)
+        data = self._get_endpoint(url).json()
+        return data
+         
+    
+    def get_document_id(self, remote_path):
+        """
+        Gets the document id for a given path (file or folder).
+        
+        Args:
+            remote_path (string): The document path
+            
+        Returns:
+            string: the document id
+        """
+        
         encoded_remote_path = quote_plus(remote_path)
         url = "/resolve/entry/path/{enc_path}".format(enc_path = encoded_remote_path)
         remote_entry = self._get_endpoint(url).json()
-        remote_id = remote_entry['entry_id']
+        return remote_entry['entry_id']
+        
 
-        url = "/documents/{remote_id}/file".format(
-                base_url = self.base_url,
-                remote_id = remote_id)
+    def download(self, document_id):
+        """
+        Downloads a document from the device.
+        
+        Args:
+            document_id (string) : The document ID
+            
+        Returns:
+            bytes: the document.
+        """
+
+
+        url = "/documents/{document_id}/file".format(document_id = document_id)
         response = self._get_endpoint(url)
         return response.content
 
-    def upload(self, fh, remote_path):
-        filename = os.path.basename(remote_path)
-        remote_directory = os.path.dirname(remote_path)
-        encoded_directory = quote_plus(remote_directory)
-        url = "/resolve/entry/path/{enc_dir}".format(enc_dir = encoded_directory)
-        directory_entry = self._get_endpoint(url).json()
-
-        directory_id = directory_entry["entry_id"]
+    def upload(self, parent_folder_id, file_name, fh):
+        """
+        Uploads a document to the device.
+        
+        Args:
+            remote_folder_id (str): The id of a folder on the remote device
+            file_name (str): The name of the new file
+            fh (file handle): An open file handle to the document to upload
+            
+        Returns:
+            string: The remote id of the new document
+        """
+#         filename = os.path.basename(remote_path)
+#         remote_directory = os.path.dirname(remote_path)
+#         encoded_directory = quote_plus(remote_directory)
+#         url = "/resolve/entry/path/{enc_dir}".format(enc_dir = encoded_directory)
+#         directory_entry = self._get_endpoint(url).json()
+# 
+#         directory_id = directory_entry["entry_id"]
         info = {
-            "file_name": filename,
-            "parent_folder_id": directory_id,
+            "file_name": file_name,
+            "parent_folder_id": parent_folder_id,
             "document_source": ""
         }
         r = self._post_endpoint("/documents2", data=info)
         doc = r.json()
-        doc_id = doc["document_id"]
-        doc_url = "/documents/{doc_id}/file".format(doc_id = doc_id)
+        document_id = doc["document_id"]
+        document_url = "/documents/{document_id}/file".format(document_id = document_id)
 
         files = {
-            'file': (filename, fh, 'rb')
+            'file': (file_name, fh, 'rb')
         }
-        self._put_endpoint(doc_url, files=files)
+        self._put_endpoint(document_url, files=files)
+        
+        return document_id
 
-    def delete(self, remote_path):
-        encoded_remote_path = quote_plus(remote_path)
-        url = "/resolve/entry/path/{enc_path}".format(enc_path = encoded_remote_path)
-        remote_entry = self._get_endpoint(url).json()
-        remote_id = remote_entry['entry_id']
+    def delete(self, document_id):
+        """
+        Deletes a document
+        
+        Args:
+            document_id (string): The document id
+        """
 
-        url = "/documents/{remote_id}".format(
-                base_url = self.base_url,
-                remote_id = remote_id)
-        return self._delete_endpoint(url)
+        url = "/documents/{document_id}".format(document_id = document_id)
+        return self._delete_endpoint(url).json()
 
-    def new_folder(self, remote_path):
-        folder_name = os.path.basename(remote_path)
-        remote_directory = os.path.dirname(remote_path)
-        encoded_directory = quote_plus(remote_directory)
-        url = "/resolve/entry/path/{enc_dir}".format(enc_dir = encoded_directory)
-        directory_entry = self._get_endpoint(url).json()
+    def new_folder(self, parent_folder_id, folder_name):
+        """
+        Make a new folder
+        
+        Args:
+            parent_folder_id (string): The id of the parent folder
+            folder_name (string): The name of the new folder
+            
+        Returns:
+            string: The id of the new folder
+        """
 
-        directory_id = directory_entry["entry_id"]
         info = {
             "folder_name": folder_name,
-            "parent_folder_id": directory_id
+            "parent_folder_id": parent_folder_id
         }
 
         r = self._post_endpoint("/folders2", data=info)
+        doc = r.json()
+        return doc['folder_id']
+    
+    def delete_folder(self, folder_id):
+        """
+        Deletes a folder.
+        
+        WARNING: The folder does not have to be empty!
+        
+        Args:
+            folder_id (string): The ID of the folder to delete
+        """
+        
+        url = "/folders/{folder_id}".format(folder_id = folder_id)
+        return self._delete_endpoint(url)
 
     def list_templates(self):
-        data = self._get_endpoint('/viewer/configs/note_templates')
-        return data.json()['template_list']
+        """
+        List the note templates on the device.
+        
+        Returns:
+            list of string: the names of the templates
+        """
+        
+        data = self._get_endpoint('/viewer/configs/note_templates').json()
+        return data['template_list']
+    
+    def get_template_id(self, template_name):
+        """
+        Get a template's id
+        
+        Args:
+            template_name (string): the name of a template to get
+            
+        Returns:
+            string: The template id
+        
+        Raises:
+            StopIteration: If the template can't be found
+        """
+        
+        # there doesn't appear to be a 'resolve' endpoint for templates.  so get all and iterate
+        templates = self.list_templates()
+        return next(t['note_template_id'] for t in templates if t['template_name'] == template_name)
 
-    def upload_template(self, filehandle, template_name):
+
+    def upload_template(self, fh, template_name):
+        """
+        Upload a new template
+        
+        Args:
+            fh (file handle): a file handle to the open template file
+            template_name (string): the new template's name
+            
+        Returns:
+            string: the new template's id
+        """
+            
         params = {
                 "template_name" : template_name
                 }
@@ -307,25 +434,24 @@ class DigitalPaper():
                 .format(template_id = template_id)
 
         files = {
-                'file' : (template_name, filehandle, 'rb')
+                'file' : (template_name, fh, 'rb')
                 }
-        self._put_endpoint(url, files = files)
+        self._put_endpoint(url, files = files).json()
+        
+        return template_id
 
-    def delete_template(self, template_name):
-        data = self._get_endpoint('/viewer/configs/note_templates')
-        template_id = None
-        for d in data.json()['template_list']:
-            if d['template_name'] == template_name:
-                template_id = d['note_template_id']
-                break
+    def delete_template(self, template_id):
+        """
+        Delete a template
+        
+        Args:
+            template_id (string): The ID of the template to delete
+        """
 
-        if template_id is None:
-            raise RuntimeError("Could not find a template named {}" \
-                    .format(template_name))
 
         url = '/viewer/configs/note_templates/{template_id}' \
                 .format(template_id = template_id)
-        return self._delete_endpoint(url)
+        return self._delete_endpoint(url).json()
                 
 
     ### Wifi 

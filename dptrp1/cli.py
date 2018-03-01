@@ -9,43 +9,66 @@ import logging
 from dptrp1.api import DigitalPaper
 
 def do_screenshot(d, filename):
-    pic = d.take_screenshot()
-    with open(filename, 'wb') as f:
-        f.write(pic)
-
-# def do_status(d):
-#     print(d.status())
-# 
-# def do_test_mode(d):
-#     print(d.test_mode())
+    try:
+        pic = d.take_screenshot()
+        with open(filename, 'wb') as f:
+            f.write(pic)
+    except Exception as e:
+        print(e)
 
 def do_list_documents(d):
-    data = d.list_documents()
-    for d in data:
-        if d['entry_type'] != 'folder':
-            print(d['entry_path'])
+    try:
+        data = d.list_documents()
+        for d in data:
+            if d['entry_type'] != 'folder':
+                print(d['entry_path'])
+    except Exception as e:
+        print(e)
 
 def do_list_folders(d):
-    data = d.list_documents()
-    for d in data:
-        if d['entry_type'] == 'folder':
-            print(d['entry_path'])
+    try:
+        data = d.list_documents()
+        for d in data:
+            if d['entry_type'] == 'folder':
+                print(d['entry_path'])
+    except Exception as e:
+        print(e)
 
-def do_list_templates(d):
-    data = d.list_templates()
-    for d in data:
-        print(d['template_name'])
+def do_list_templates(d):   
+    try:
+        data = d.list_templates()
+        for t in data:
+            print(t['template_name'])
+    except Exception as e:
+        print(e)
+        
 
 def do_upload_template(d, local_path, template_name):
-    with open(local_path, 'rb') as f:
-        d.upload_template(f, template_name)
+    try:
+        with open(local_path, 'rb') as fh:
+            print(d.upload_template(fh, template_name))
+    except Exception as e:
+        print(e)
 
 def do_delete_template(d, template_name):
-    d.delete_template(template_name)
+    try:
+        template_id = d.get_template_id(template_name)
+        d.delete_template(template_id)
+    except Exception as e:
+        print(e)
 
 def do_upload(d, local_path, remote_path):
-    with open(local_path, 'rb') as fh:
-        d.upload(fh, remote_path)
+    
+    parent_folder, filename = os.path.split(remote_path)
+    
+    try:
+        parent_folder_id = d.get_document_id(parent_folder)
+    
+        with open(local_path, 'rb') as fh:
+            d.upload(parent_folder_id, filename, fh)
+            
+    except Exception as e:
+        print(e)
 
 def do_download(d, remote_path, local_path):
     data = d.download(remote_path)
@@ -54,10 +77,28 @@ def do_download(d, remote_path, local_path):
         f.write(data)
 
 def do_delete(d, remote_path):
-    d.delete(remote_path)
+    try:
+        document_id = d.get_document_id(remote_path)
+        d.delete(document_id)
+    except Exception as e:
+        print(e)
 
 def do_new_folder(d, remote_path):
-    d.new_folder(remote_path)
+    
+    parent_folder, new_folder = os.path.split(remote_path)
+
+    try:
+        parent_folder_id = d.get_document_id(parent_folder)
+        d.new_folder(parent_folder_id, new_folder)
+    except Exception as e:
+        print(e)
+    
+def do_delete_folder(d, remote_path):
+    try:
+        folder_id = d.get_document_id(remote_path)
+        d.delete_folder(folder_id)
+    except Exception as e:
+        print(e)
 
 def do_wifi_list(d):
     data = d.wifi_list()
@@ -90,9 +131,6 @@ def do_add_wifi(d):
 
 def do_delete_wifi(d):
     print(d.delete_wifi(ssid = "vecna2", security = "psk"))
-
-def do_register(d):
-    cert, new_key, device_id = d.register()
     
 def do_info(d):
     print(d.device_information())
@@ -191,16 +229,13 @@ def do_sync_download(d, remote_folder, local_folder):
 
 
 
-
-if __name__ == "__main__":
+def main():
     
     logging.getLogger().setLevel(logging.DEBUG)
 
 
     commands = {
         "screenshot": do_screenshot,
-        #"status": do_status,
-        #"testmode": do_test_mode,
         "list-documents" : do_list_documents,
         "list-folders" : do_list_folders,
         "list-templates" : do_list_templates,
@@ -210,6 +245,7 @@ if __name__ == "__main__":
         "download" : do_download,
         "delete" : do_delete,
         "new-folder" : do_new_folder,
+        "delete-folder" : do_delete_folder,
         "wifi-list": do_wifi_list,
         "wifi-scan": do_wifi_scan,
         "wifi-add": do_add_wifi,
@@ -217,7 +253,6 @@ if __name__ == "__main__":
         "wifi": do_wifi,
         "wifi-enable" : do_wifi_enable,
         "wifi-disable" : do_wifi_disable,
-        "register" : do_register,
         "info" : do_info,
         "sync-up" : do_sync_upload,
         "sync-down" : do_sync_download
@@ -269,3 +304,5 @@ if __name__ == "__main__":
 
     commands[args.command](dp, *args.command_args)
 
+if __name__ == "__main__":
+    main()
