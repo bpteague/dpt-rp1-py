@@ -4,8 +4,7 @@ Created on Feb 24, 2018
 @author: brian
 '''
 
-import os
-import requests
+import os, logging, requests
 
 # Enthought library imports.
 from envisage.api import Plugin, ExtensionPoint, contributes_to
@@ -177,7 +176,45 @@ class GUITask(Task, Controller):
         pass
 
     def _upload_files(self, editor):
-        pass
+        
+        selected = editor.selected[0]
+
+        d = FileDialog(action = 'open files',
+                       wildcard = '"PDF files (*.pdf)|*.pdf|"',
+                       style = 'modal')
+        d.open()
+        
+        if d.return_code != OK:
+            return
+        
+        for path in d.paths:
+            _, filename = os.path.split(path)
+            remote_folder = selected.entry_path
+            remote_path = remote_folder + '/' + filename
+
+            try:
+                remote_id = self.dp.get_document_id(remote_path)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code != 404:
+                    raise e
+                remote_id = None
+            
+            if remote_id is not None:
+                ret = confirm(
+                        None, 
+                        "{} already exists!  Overwrite?".format(remote_path),
+                        title = "Overwrite?",
+                        default = NO)
+                if ret == NO:
+                    continue
+                
+            logging.debug("Uploading {}".format(remote_path))
+            
+            with open(path, 'rb') as fh:
+                remote_id = self.dp.upload(selected.entry_id, filename, fh)
+            
+            remote_file_info = self.dp.get_document_info(remote_id)
+            selected.files.append(File(**remote_file_info))
 
     def _download_files(self, editor):
         pass
