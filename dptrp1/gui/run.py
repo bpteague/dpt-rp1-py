@@ -4,24 +4,17 @@ Created on Feb 24, 2018
 @author: brian
 '''
 
-import logging, io, os, pickle, threading, traceback
+import logging, os, pickle, threading, traceback
 
 from envisage.ui.tasks.api import TasksApplication
 from envisage.ui.tasks.tasks_application import TasksApplicationState
 from pyface.api import error
 from pyface.tasks.api import TaskWindowLayout
-from traits.api import Bool, Instance, List, Property, Str, Any
+from traits.api import Bool, Instance, List, Property, Str
 
 logger = logging.getLogger(__name__)
 
 from dptrp1.gui.preferences import Preferences
-
-
-# Enthought library imports.
-from pyface.api import GUI
-from pyface.tasks.api import TaskWindow
-
-from dptrp1.gui.gui_task import GUITask
 
 def log_notification_handler(_, trait_name, old, new):
     
@@ -38,6 +31,15 @@ def log_notification_handler(_, trait_name, old, new):
     logging.error("Error: {0}\nLocation: {1}Thread: {2}" \
                   .format(err_string, err_loc, err_ctx) )
     
+def log_excepthook(typ, val, tb):
+    tb_str = "".join(traceback.format_tb(tb))
+    logging.debug("Global exception: {0}\n{1}: {2}"
+                  .format(tb_str, typ, val))
+    
+    tb_str = traceback.format_tb(tb)[-1]
+    logging.error("Error: {0}: {1}\nLocation: {2}Thread: Main"
+                  .format(typ, val, tb_str))
+
 
 def gui_handler_callback(msg, app):
     app.application_error = msg
@@ -63,7 +65,7 @@ class DPTApplication(TasksApplication):
     # The default window-level layout for the application.
     default_layout = List(TaskWindowLayout)
  
-     # if there's an ERROR-level log message, drop it here     
+    # if there's an ERROR-level log message, drop it here     
     application_error = Str
  
     # Whether to restore the previous application-level layout when the
@@ -71,37 +73,6 @@ class DPTApplication(TasksApplication):
     always_use_default_layout = Property(Bool)
 
     preferences_helper = Instance(Preferences)
-
-    ###########################################################################
-    # Private interface.
-    ###########################################################################
-     
-#     def _load_state(self):
-#         """ 
-#         Loads saved application state, if possible.  Overload the envisage-
-#         defined one to fix a py3k bug and increment the TasksApplicationState
-#         version.
-#         
-#         """
-#         state = TasksApplicationState(version = 1)
-#         filename = os.path.join(self.state_location, 'application_memento')
-#         if os.path.exists(filename):
-#             # Attempt to unpickle the saved application state.
-#             try:
-#                 with open(filename, 'rb') as f:
-#                     restored_state = pickle.load(f)
-#                 if state.version == restored_state.version:
-#                     state = restored_state
-#                 else:
-#                     logger.warn('Discarding outdated application layout')
-#             except:
-#                 # If anything goes wrong, log the error and continue.
-#                 logger.exception('Had a problem restoring application layout from %s',
-#                                  filename)
-#                  
-#         self._state = state
-     
-    #### Trait initializers ###################################################
 
     def _default_layout_default(self):
         active_task = self.preferences_helper.default_task
@@ -113,16 +84,55 @@ class DPTApplication(TasksApplication):
     def _preferences_helper_default(self):
         return Preferences(preferences = self.preferences)
 
-    #### Trait property getter/setters ########################################
- 
-    #### Trait property getter/setters ########################################
- 
     def _get_always_use_default_layout(self):
         return self.preferences_helper.always_use_default_layout
     
     def show_error(self, error_string):
-        error(None, "An exception has occurred.\n\n" 
-                    + error_string)
+        error(None, error_string)
+        
+    def _load_state(self):
+        """ 
+        Loads saved application state, if possible.  Overload the envisage-
+        defined one to fix a py3k bug and increment the TasksApplicationState
+        version.
+        
+        """
+        state = TasksApplicationState(version = 2)
+        filename = os.path.join(self.state_location, 'application_memento')
+        if os.path.exists(filename):
+            # Attempt to unpickle the saved application state.
+            try:
+                with open(filename, 'rb') as f:
+                    restored_state = pickle.load(f)
+                if state.version == restored_state.version:
+                    state = restored_state
+                else:
+                    logger.warn('Discarding outdated application layout')
+            except:
+                # If anything goes wrong, log the error and continue.
+                logger.exception('Had a problem restoring application layout from %s',
+                                 filename)
+                 
+        self._state = state
+
+    def _save_state(self):
+        """
+        Saves the application state -- ONLY IF THE CYTOFLOW TASK IS ACTIVE
+        
+        """
+
+        # Grab the current window layouts.
+        window_layouts = [w.get_window_layout() for w in self.windows]
+        self._state.previous_window_layouts = window_layouts
+     
+        # Attempt to pickle the application state.
+        filename = os.path.join(self.state_location, 'application_memento')
+        try:
+            with open(filename, 'wb') as f:
+                pickle.dump(self._state, f)
+        except:
+            # If anything goes wrong, log the error and continue.
+            logger.exception('Had a problem saving application layout')
 
 
 def main(argv):
@@ -137,8 +147,6 @@ def main(argv):
     except:
         # if there's no console, this fails
         pass
-    
-
  
     # install a global (gui) error handler for traits notifications
     from traits.api import push_exception_handler
@@ -146,7 +154,6 @@ def main(argv):
                            reraise_exceptions = True, 
                            main = True)
     
-
 
     from envisage.core_plugin import CorePlugin
     from envisage.ui.tasks.tasks_plugin import TasksPlugin
@@ -157,12 +164,14 @@ def main(argv):
     ## and display gui messages for exceprions
     gui_handler = CallbackHandler( lambda msg, app = app: gui_handler_callback(msg, app))
     gui_handler.setLevel(logging.ERROR)
-    logging.getLogger().addHandler(gui_handler)    
+    logging.getLogger().addHandler(gui_handler)  
     
     # must redirect to the gui thread
     app.on_trait_change(app.show_error, 'application_error', dispatch = 'ui')
 
-    
+    sys.excepthook = log_excepthook    
+
+
     app.run()
 
 if __name__ == '__main__':
