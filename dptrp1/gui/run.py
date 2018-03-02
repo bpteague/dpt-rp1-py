@@ -4,7 +4,7 @@ Created on Feb 24, 2018
 @author: brian
 '''
 
-import logging, io, os, pickle
+import logging, io, os, pickle, threading, traceback
 
 from envisage.ui.tasks.api import TasksApplication
 from envisage.ui.tasks.tasks_application import TasksApplicationState
@@ -23,6 +23,35 @@ from pyface.tasks.api import TaskWindow
 
 from dptrp1.gui.gui_task import GUITask
 
+def log_notification_handler(_, trait_name, old, new):
+    
+    (exc_type, exc_value, tb) = sys.exc_info()
+    logging.debug('Exception occurred in traits notification '
+                  'handler for object: %s, trait: %s, old value: %s, '
+                  'new value: %s.\n%s\n' % ( object, trait_name, old, new,
+                  ''.join( traceback.format_exception(exc_type, exc_value, tb) ) ) )
+
+    err_string = traceback.format_exception_only(exc_type, exc_value)[0]
+    err_loc = traceback.format_tb(tb)[-1]
+    err_ctx = threading.current_thread().name
+    
+    logging.error("Error: {0}\nLocation: {1}Thread: {2}" \
+                  .format(err_string, err_loc, err_ctx) )
+    
+
+def gui_handler_callback(msg, app):
+    app.application_error = msg
+    
+
+class CallbackHandler(logging.Handler):
+    def __init__(self, callback):
+        logging.Handler.__init__(self)
+        self._callback = callback
+        
+    def emit(self, record):
+        self._callback(record.getMessage())
+
+
 class DPTApplication(TasksApplication):
 
     # The application's globally unique identifier.
@@ -34,6 +63,8 @@ class DPTApplication(TasksApplication):
     # The default window-level layout for the application.
     default_layout = List(TaskWindowLayout)
  
+     # if there's an ERROR-level log message, drop it here     
+    application_error = Str
  
     # Whether to restore the previous application-level layout when the
     # applicaton is started.
@@ -88,6 +119,10 @@ class DPTApplication(TasksApplication):
  
     def _get_always_use_default_layout(self):
         return self.preferences_helper.always_use_default_layout
+    
+    def show_error(self, error_string):
+        error(None, "An exception has occurred.\n\n" 
+                    + error_string)
 
 
 def main(argv):
@@ -102,13 +137,32 @@ def main(argv):
     except:
         # if there's no console, this fails
         pass
-
     
+
+ 
+    # install a global (gui) error handler for traits notifications
+    from traits.api import push_exception_handler
+    push_exception_handler(handler = log_notification_handler,
+                           reraise_exceptions = True, 
+                           main = True)
+    
+
+
     from envisage.core_plugin import CorePlugin
     from envisage.ui.tasks.tasks_plugin import TasksPlugin
     from dptrp1.gui.gui_task import GUITaskPlugin
     
     app = DPTApplication(plugins = [CorePlugin(), TasksPlugin(), GUITaskPlugin()])
+    
+    ## and display gui messages for exceprions
+    gui_handler = CallbackHandler( lambda msg, app = app: gui_handler_callback(msg, app))
+    gui_handler.setLevel(logging.ERROR)
+    logging.getLogger().addHandler(gui_handler)    
+    
+    # must redirect to the gui thread
+    app.on_trait_change(app.show_error, 'application_error', dispatch = 'ui')
+
+    
     app.run()
 
 if __name__ == '__main__':
