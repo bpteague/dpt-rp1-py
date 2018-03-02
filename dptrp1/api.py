@@ -345,7 +345,7 @@ class DigitalPaper():
         """
 
         url = "/documents/{document_id}".format(document_id = document_id)
-        return self._delete_endpoint(url).json()
+        return self._delete_endpoint(url)
 
     def new_folder(self, parent_folder_id, folder_name):
         """

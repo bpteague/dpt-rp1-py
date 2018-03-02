@@ -142,12 +142,16 @@ class GUITask(Task, Controller):
         parent = selected[0].parent_folder
 
         for s in selected:
-            if isinstance(selected, Folder):
-                self.dp.delete(s.entry_id)
-            else: #file
+            if isinstance(s, Folder):
                 self.dp.delete_folder(s.entry_id)
+            else: #file
+                self.dp.delete(s.entry_id)
             
             # remove from model -- which removes it from the tree
+            # TODO - this raises an exception when removing a folder.
+            # possibly because we're removing the object from a
+            # handler on the object itself.
+            
             parent.files.remove(s)
         
 
