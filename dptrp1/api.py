@@ -520,6 +520,39 @@ class DigitalPaper():
         return self._delete_endpoint(url).json()
                 
 
+    def get_configuration(self):
+        url = '/system/configs'
+        return self._get_endpoint(url).json()
+    
+    def set_timeformat(self, fmt):
+        """
+        Sets the clock's time format
+        
+        Args:
+            fmt (string): Must be "12hour" or "24hour"
+        """
+        
+        if fmt != '12hour' and fmt != '24hour':
+            raise RuntimeError('format must be "12hour" or "24hour"')
+        
+        url = '/system/configs/time_format'
+        info = {'value' : fmt}
+        
+        self._put_endpoint(url, data = info)
+    
+    def update_datetime(self):
+        """
+        Sets the device date and time to the host date and time
+        """
+        
+        # value = YYYY-MM-DDTHH:mm
+        from datetime import datetime
+        url = '/system/configs/datetime'
+        info = {'value' : datetime.now().strftime("%Y-%m-%dT%H:%M")}
+        
+        self._put_endpoint(url, data = info)
+        
+
     ### Wifi 
     def wifi_list(self):
         data = self._get_endpoint('/system/configs/wifi_accesspoints').json()

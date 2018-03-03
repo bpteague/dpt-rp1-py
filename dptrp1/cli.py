@@ -162,7 +162,13 @@ def do_delete_wifi(d):
     print(d.delete_wifi(ssid = "vecna2", security = "psk"))
     
 def do_info(d):
-    print(d.device_information())
+    print("Device information:")
+    print(json.dumps(d.device_information(), indent = 2))
+    print("Device configuration:")
+    print(json.dumps(d.get_configuration(), indent = 2))
+    
+def do_timeformat(d, fmt):
+    d.set_timeformat(fmt)
     
 
 def do_sync_upload(d, local_folder, remote_folder):
@@ -284,6 +290,7 @@ def main():
         "wifi-enable" : do_wifi_enable,
         "wifi-disable" : do_wifi_disable,
         "info" : do_info,
+        "timeformat" : do_timeformat,
         "sync-up" : do_sync_upload,
         "sync-down" : do_sync_download
     }
@@ -331,6 +338,7 @@ def main():
             key = fh.read()
 
         dp.authenticate(client_id, key)
+        dp.update_datetime()
 
     commands[args.command](dp, *args.command_args)
 
