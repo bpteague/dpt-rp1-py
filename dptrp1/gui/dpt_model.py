@@ -4,13 +4,14 @@ Created on Feb 24, 2018
 @author: brian
 '''
 
-from traits.api import HasTraits, Str, List, CBool, CInt, Enum, Either, Instance, Property
+from traits.api import HasTraits, Str, List, CBool, CInt, Enum, Either, Instance, Property, on_trait_change
 from traitsui.api import View, Item, TreeEditor, TreeNode, Menu, Action
-from traitsui.qt4.tree_editor import NewAction, RenameAction, DeleteAction
-from pyface.tasks.action.api import TaskAction
+from traitsui.qt4.tree_editor import RenameAction
+from pyface.api import error
 
 class File(HasTraits):
-    name = Property
+    task = Instance("dptrp1.gui.gui_task.GUITask")
+    
     entry_id = Str
     document_source = Str
     entry_type = Enum(['document', 'folder'])
@@ -31,12 +32,18 @@ class File(HasTraits):
     file_revision = Str
     
     parent_folder = Instance("dptrp1.gui.dpt_model.Folder")
-    
-    def _get_name(self):
-        return self.entry_name
+
+    @on_trait_change('entry_name', post_init = True)    
+    def _rename(self, obj, trait, old, new):
+        try:
+            self.task._rename(self, new)
+        except Exception:
+            error(None, "Can not rename file {} to {}".format(old, new))
+            self.trait_setq(entry_name = old)
 
 class Folder(HasTraits):
-    name = Property
+    task = Instance("dptrp1.gui.gui_task.GUITask")
+    
     created_date = Str
     document_source = Str
     entry_name = Str
@@ -47,10 +54,16 @@ class Folder(HasTraits):
     is_new = CBool
     
     parent_folder = Instance("dptrp1.gui.dpt_model.Folder")
-    files = List(Either(Instance("dptrp1.gui.dpt_model.File"), Instance("dptrp1.gui.dpt_model.Folder")))
-    
-    def _get_name(self):
-        return self.entry_name
+    files = List(Either(Instance("dptrp1.gui.dpt_model.File"), Instance("dptrp1.gui.dpt_model.Folder"))) 
+       
+    @on_trait_change('entry_name', post_init = True)    
+    def _rename(self, obj, trait, old, new):
+        try:
+            self.task._rename(self, new)
+        except Exception:
+            error(None, "Can not rename file {} to {}".format(old, new))
+            self.trait_setq(entry_name = old)
+
     
 DeleteAction = Action(name = 'Delete',
                       action = 'handler._delete_nodes(editor)')
@@ -63,6 +76,10 @@ DownloadAction = Action(name = 'Download',
 
 SyncAction = Action(name = "Synchronize",
                     action = 'handler._sync_folder(editor)')
+ 
+NewFolderAction = Action(name = "New Folder",
+                         action = 'handler._new_folder(editor)')
+
 
 class DPTModel(HasTraits):
     root = Instance(Folder, ())
@@ -76,7 +93,7 @@ class DPTModel(HasTraits):
                                                  children = 'files',
                                                  view = View(),
                                                  add = [Folder],
-                                                 menu = Menu(NewAction,
+                                                 menu = Menu(NewFolderAction,
                                                              DeleteAction,
                                                              RenameAction,
                                                              UploadAction,

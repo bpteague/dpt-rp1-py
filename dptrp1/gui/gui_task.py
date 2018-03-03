@@ -6,7 +6,6 @@ Created on Feb 24, 2018
 
 import os, logging, requests
 
-# Enthought library imports.
 from envisage.api import Plugin, contributes_to
 from envisage.ui.tasks.api import TaskFactory
 from envisage.ui.tasks.action.preferences_action import PreferencesAction
@@ -14,7 +13,7 @@ from envisage.ui.tasks.action.preferences_action import PreferencesAction
 from pyface.tasks.api import Task
 from pyface.tasks.action.api import SMenuBar, SMenu, SToolBar, TaskAction
 from pyface.api import error, FileDialog, OK, NO, confirm
-from traits.api import Instance
+from traits.api import HasTraits, Instance, Str
 from traitsui.api import Controller
 
 from dptrp1.gui.gui_panes import DPTPane
@@ -37,9 +36,6 @@ class GUITask(Task, Controller):
     dp = Instance(DigitalPaper)
     model = Instance(DPTModel, ())
 
-    #default_layout = TaskLayout(
-    #    left=PaneItem('example.python_script_browser_pane'))
-
     menu_bar = SMenuBar(SMenu(TaskAction(name='Connect...', method='connect',
                                          accelerator='Ctrl+O'),
                               PreferencesAction(name = "Register..."),
@@ -59,9 +55,6 @@ class GUITask(Task, Controller):
         """
         return DPTPane(model = self.model)
 
-    ###########################################################################
-    # 'ExampleTask' interface.
-    ###########################################################################
 
     def connect(self):
         addr = self.application.preferences_helper.addr
@@ -77,20 +70,23 @@ class GUITask(Task, Controller):
             error(None, "Error authenticating with DPT-RP1 at {}: {}".format(addr, str(e)))
         except Exception as e:
             error(None, "Other error connecting to DPT-RP1: {}".format(str(e)))
-            
+
+        docs = self.dp.list_documents()
+        
         files = []
-        folders = [Folder(entry_id = "root",
+        folders = [Folder(task = self,
+                          entry_id = "root",
                           entry_name = "Document")]
             
-        docs = self.dp.list_documents()
+        
         for d in docs:
             if d['entry_type'] == 'folder':
-                f = Folder(**d)
+                f = Folder(task = self, **d)
                 folders.append(f)
             else:
-                f = File(**d)
+                f = File(task = self, **d)
                 files.append(f)
-                
+                        
         for file in files:
             folder = next(f for f in folders if f.entry_id == file.parent_folder_id)
             folder.files.append(file)
@@ -104,7 +100,7 @@ class GUITask(Task, Controller):
             folder.parent_folder = parent_folder
             
         self.model.root = folders[0]
-                
+
         
     def _delete_nodes(self, editor):
         selected = editor.selected
@@ -112,7 +108,7 @@ class GUITask(Task, Controller):
         if len(selected) == 1:
             ret = confirm(
                     None, 
-                    "Are you sure you want to delete {}?".format(selected[0].name),
+                    "Are you sure you want to delete {}?".format(selected[0].entry_name),
                     title = "Delete?",
                     default = NO)
             if ret == NO:
@@ -144,16 +140,37 @@ class GUITask(Task, Controller):
         for s in selected:
             if isinstance(s, Folder):
                 self.dp.delete_folder(s.entry_id)
-            else: #file
+            else: 
                 self.dp.delete(s.entry_id)
             
             # remove from model -- which removes it from the tree
-            # TODO - this raises an exception when removing a folder.
-            # possibly because we're removing the object from a
-            # handler on the object itself.
             
             parent.files.remove(s)
+            
+    def _rename(self, entry, new_name):        
+        if isinstance(entry, Folder):
+            self.dp.rename_folder(entry.entry_id, new_name)
+        else:
+            self.dp.rename_document(entry.entry_id, new_name)
+            
+    def _new_folder(self, editor):
         
+        selected = editor.selected[0]
+        
+        class NewFolder(HasTraits):
+            name = Str
+            
+        nf = NewFolder()
+        nf.edit_traits(kind = 'modal')
+        
+        if not nf.name:
+            return
+        
+        new_folder_id = self.dp.new_folder(selected.entry_id, nf.name)
+        new_folder_info = self.dp.get_folder_info(new_folder_id)
+        
+        new_folder = Folder(**new_folder_info)
+        selected.files.append(new_folder)
 
     def _upload_files(self, editor):
         
@@ -173,7 +190,7 @@ class GUITask(Task, Controller):
             remote_path = remote_folder + '/' + filename
 
             try:
-                remote_id = self.dp.get_document_id(remote_path)
+                remote_id = self.dp.resolve(remote_path)['entry_id']
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code != 404:
                     raise e
@@ -197,7 +214,26 @@ class GUITask(Task, Controller):
             selected.files.append(File(**remote_file_info))
 
     def _download_files(self, editor):
-        pass
+        selected = editor.selected
+
+        if len(selected) == 1 and isinstance(selected[0], File):
+            d = FileDialog(action = 'save as',
+                           wildcard = 'PDF files (*.pdf)|*.pdf|',
+                           style = 'modal',
+                           default_filename = selected[0].entry_name)
+                
+            d.open() 
+            
+            if d.return_code != OK:
+                return
+            
+            data = self.dp.download(selected[0].entry_id)
+            with open(d.path, 'wb') as f:
+                f.write(data)
+                
+        else:
+            error(None, "For the moment, can only download one file at a time.")
+
 
     def _sync_folder(self, editor):
         pass

@@ -253,7 +253,7 @@ class DigitalPaper():
     
     def get_document_info(self, document_id):
         """
-        Gets the document info for a single document.
+        Gets the document info for a single document (not a folder).
         
         Args:
             document_id (int): The document id
@@ -265,24 +265,38 @@ class DigitalPaper():
         url = '/documents2/{document_id}'.format(document_id = document_id)
         data = self._get_endpoint(url).json()
         return data
-         
     
-    def get_document_id(self, remote_path):
+    def get_folder_info(self, folder_id):
         """
-        Gets the document id for a given path (file or folder).
+        Gets the folder info for a single folder.
+        
+        Args:
+            folder_id (int): The folder id
+            
+        Returns:
+            dict: A dictionary with the folder info
+        """
+        
+        url = '/folders2/{folder_id}'.format(folder_id = folder_id)
+        data = self._get_endpoint(url).json()
+        return data
+         
+         
+    def resolve(self, remote_path):
+        """
+        Gets info (doc id, entry type, etc) for a given path (file or folder).
         
         Args:
             remote_path (string): The document path
             
         Returns:
-            string: the document id
+            dict: the document info for the path
         """
         
         encoded_remote_path = quote_plus(remote_path)
         url = "/resolve/entry/path/{enc_path}".format(enc_path = encoded_remote_path)
-        remote_entry = self._get_endpoint(url).json()
-        return remote_entry['entry_id']
-        
+        return self._get_endpoint(url).json()
+
 
     def download(self, document_id):
         """
@@ -346,6 +360,58 @@ class DigitalPaper():
 
         url = "/documents/{document_id}".format(document_id = document_id)
         return self._delete_endpoint(url)
+    
+    def move_document(self, document_id, new_parent_folder_id):        
+        
+        info = {
+            #"file_name": file_name,
+            "parent_folder_id": new_parent_folder_id,
+        }
+        self._put_endpoint("/documents2/{document_id}"
+                           .format(document_id = document_id), 
+                           data=info)
+        
+    
+    def rename_document(self, document_id, new_name):
+        """
+        Renames a document (not a folder)
+        
+        Args:
+            document_id (string): The document ID
+            new_name (string): The new document name
+            
+        """
+
+        info = {
+            "file_name" : new_name
+            }
+        
+        self._put_endpoint("/documents2/{document_id}"
+                           .format(document_id = document_id), 
+                           data=info)
+                    
+    def move_folder(self, folder_id, new_parent_folder_id):
+        pass
+    
+    def rename_folder(self, folder_id, new_name):
+        """
+        Renames a folder (not a document)
+        
+        Args:
+            folder_id (string): The folder ID
+            new_name (string): The new folder name
+        """
+        # /folders2/{id}
+        # parent_folder_id
+        # folder_name
+        # ext_id
+        info = {
+            "folder_name" : new_name,
+            }
+        
+        self._put_endpoint("/folders2/{folder_id}"
+                           .format(folder_id = folder_id), 
+                           data=info)
 
     def new_folder(self, parent_folder_id, folder_name):
         """

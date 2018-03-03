@@ -1,5 +1,4 @@
 import argparse
-import base64
 import sys
 import json
 import os
@@ -62,7 +61,7 @@ def do_upload(d, local_path, remote_path):
     parent_folder, filename = os.path.split(remote_path)
     
     try:
-        parent_folder_id = d.get_document_id(parent_folder)
+        parent_folder_id = d.resolve(parent_folder)['entry_id']
     
         with open(local_path, 'rb') as fh:
             d.upload(parent_folder_id, filename, fh)
@@ -75,27 +74,57 @@ def do_download(d, remote_path, local_path):
 
     with open(local_path, 'wb') as f:
         f.write(data)
-
+ 
 def do_delete(d, remote_path):
     try:
-        document_id = d.get_document_id(remote_path)
+        document_id = d.resolve(remote_path)['entry_id']
         d.delete(document_id)
     except Exception as e:
         print(e)
+
+def do_rename(d, remote_path, new_name):
+    try:
+        entry_info = d.resolve(remote_path)
+        print(entry_info)
+        entry_id = entry_info['entry_id']
+        if entry_info['entry_type'] == 'folder':
+            d.rename_folder(entry_id, new_name)
+        else:
+            d.rename_document(entry_id, new_name)
+    except Exception as e:
+        print(e)
+        
+def do_move(d, old_path, new_path):    
+    try:
+        entry_info = d.resolve(old_path)
+        entry_id = entry_info['entry_id']
+        new_parent_folder_info = d.resolve(new_path)
+        if new_parent_folder_info['entry_type'] != 'folder':
+            raise RuntimeError("New path must be a folder")
+        new_parent_folder_id = new_parent_folder_info['entry_id']
+        
+        if entry_info['entry_type'] == 'folder':
+            d.move_folder(entry_id, new_parent_folder_id)
+        else:
+            d.move_document(entry_id, new_parent_folder_id)
+    except Exception as e:
+        print(e)
+
+        
 
 def do_new_folder(d, remote_path):
     
     parent_folder, new_folder = os.path.split(remote_path)
 
     try:
-        parent_folder_id = d.get_document_id(parent_folder)
+        parent_folder_id = d.resolve(parent_folder)['entry_id']
         d.new_folder(parent_folder_id, new_folder)
     except Exception as e:
         print(e)
     
 def do_delete_folder(d, remote_path):
     try:
-        folder_id = d.get_document_id(remote_path)
+        folder_id = d.resolve(remote_path)['entry_id']
         d.delete_folder(folder_id)
     except Exception as e:
         print(e)
@@ -244,6 +273,7 @@ def main():
         "upload" : do_upload,
         "download" : do_download,
         "delete" : do_delete,
+        "rename" : do_rename,
         "new-folder" : do_new_folder,
         "delete-folder" : do_delete_folder,
         "wifi-list": do_wifi_list,

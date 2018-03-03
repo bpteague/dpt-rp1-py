@@ -135,6 +135,7 @@ class DPTApplication(TasksApplication):
             logger.exception('Had a problem saving application layout')
 
 
+
 def main(argv):
     
     logging.getLogger().setLevel(logging.DEBUG)
@@ -171,7 +172,31 @@ def main(argv):
 
     sys.excepthook = log_excepthook    
 
+    def _size_hint_wrapper(f, ui):
+        """Wrap an existing sizeHint method with sizes from a UI object.
+        """
+        def sizeHint():
+            size = f()
+            if ui.view is not None and ui.view.width > 0:
+                size.setWidth(ui.view.width)
+            if ui.view is not None and ui.view.height > 0:
+                size.setHeight(ui.view.height)
+            return size
+        return sizeHint
+    
+    import traitsui.qt4.ui_panel
+    traitsui.qt4.ui_panel._size_hint_wrapper = _size_hint_wrapper
 
+    def _tree_hash(self):
+        return id(self)
+    
+    def _tree_eq(self, other):
+        return id(self) == id(other)
+    
+    from PyQt4.QtGui import QTreeWidgetItem
+    QTreeWidgetItem.__hash__ = _tree_hash
+    QTreeWidgetItem.__eq__ = _tree_eq
+    
     app.run()
 
 if __name__ == '__main__':
