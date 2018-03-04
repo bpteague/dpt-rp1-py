@@ -548,7 +548,7 @@ class DigitalPaper():
         # value = YYYY-MM-DDTHH:mm
         from datetime import datetime
         url = '/system/configs/datetime'
-        info = {'value' : datetime.now().strftime("%Y-%m-%dT%H:%M")}
+        info = {'value' : datetime.now().isoformat()[0:19] + 'Z'}
         
         self._put_endpoint(url, data = info)
         

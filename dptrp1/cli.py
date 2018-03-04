@@ -24,6 +24,15 @@ def do_list_documents(d):
     except Exception as e:
         print(e)
 
+def do_document_info(d, remote_path):
+    try:
+        entry_info = d.resolve(remote_path)
+        entry_id = entry_info['entry_id']
+        info = d.get_document_info(entry_id)
+        print(json.dumps(info, indent = 2))
+    except Exception as e:
+        print(e)
+
 def do_list_folders(d):
     try:
         data = d.list_documents()
@@ -85,7 +94,6 @@ def do_delete(d, remote_path):
 def do_rename(d, remote_path, new_name):
     try:
         entry_info = d.resolve(remote_path)
-        print(entry_info)
         entry_id = entry_info['entry_id']
         if entry_info['entry_type'] == 'folder':
             d.rename_folder(entry_id, new_name)
@@ -169,99 +177,6 @@ def do_info(d):
     
 def do_timeformat(d, fmt):
     d.set_timeformat(fmt)
-    
-
-def do_sync_upload(d, local_folder, remote_folder):
-    from pathlib import Path
-    local_folder = Path(local_folder)
-    remote_folder = Path(remote_folder)
-
-    data = d.list_documents()
-    remote_documents = {}
-    found_remote_folder = False
-    for doc in data:
-        remote_path = Path(doc['entry_path'])
-        if doc['entry_type'] == 'folder' and remote_path == remote_folder:
-            found_remote_folder = True
-        elif doc['entry_type'] != 'folder' and remote_path.parent == remote_folder:
-            remote_documents[remote_path.name] = doc
-
-    if not found_remote_folder:
-        print("The remote folder doesn't exist.")
-        return
-
-    for doc in remote_documents.values():
-        doc['modified_datetime'] = \
-                datetime.strptime(doc['modified_date'],
-                                  "%Y-%m-%dT%H:%M:%SZ")
-    
-    to_upload = []
-    for local_file in local_folder.glob("*.pdf"):
-        if local_file.name in remote_documents:
-            remote_doc = remote_documents[local_file.name]
-            local_mod_time = datetime.utcfromtimestamp(local_file.stat().st_mtime - 60)
-            if local_mod_time > remote_doc['modified_datetime']:
-                to_upload.append(local_file)
-
-        else:
-            to_upload.append(local_file)
-
-    for path in to_upload:
-        print(str(path))
-        if path.name in remote_documents:
-            do_delete(d, str(remote_folder / path.name))
-
-        do_upload(d, str(path), str(remote_folder / path.name))
-
-
-def do_sync_download(d, remote_folder, local_folder):
-    from pathlib import Path
-    local_folder = Path(local_folder)
-    remote_folder = Path(remote_folder)
-
-    data = d.list_documents()
-    remote_documents = {}
-    found_remote_folder = False
-    for doc in data:
-        remote_path = Path(doc['entry_path'])
-        if doc['entry_type'] == 'folder' and remote_path == remote_folder:
-            found_remote_folder = True
-        elif doc['entry_type'] != 'folder' and remote_path.parent == remote_folder:
-            remote_documents[remote_path.name] = doc
-
-    if not found_remote_folder:
-        print("The remote folder doesn't exist.")
-        return
-
-    for doc in remote_documents.values():
-        doc['modified_datetime'] = \
-                datetime.strptime(doc['modified_date'],
-                                  "%Y-%m-%dT%H:%M:%SZ")
-
-    to_download = []
-    local_files = [el.name for el in local_folder.glob("*.pdf")]
-    for remote_file_name, remote_doc in remote_documents.items():
-        if remote_file_name in local_files:
-            local_path = local_folder / remote_file_name
-            local_mod_time = datetime.utcfromtimestamp(local_path.stat().st_mtime - 60)
-            print(local_path, local_mod_time, remote_doc['modified_datetime'])
-            if remote_doc['modified_datetime'] > local_mod_time:
-                to_download.append(remote_file_name)
-
-        else:
-            to_download.append(remote_file_name)
-
-    for remote_file in to_download:
-        remote_path = remote_folder / remote_file
-        local_path = local_folder / remote_file
-        print(str(remote_path))
-
-        if remote_file in local_files:
-            os.unlink(str(local_path / remote_file))
-
-        do_download(d, str(remote_path), 
-                       str(local_path))
-
 
 
 def main():
@@ -274,6 +189,7 @@ def main():
         "list-documents" : do_list_documents,
         "list-folders" : do_list_folders,
         "list-templates" : do_list_templates,
+        "document-info" : do_document_info,
         "upload-template" : do_upload_template,
         "delete-template" : do_delete_template,
         "upload" : do_upload,
@@ -290,9 +206,7 @@ def main():
         "wifi-enable" : do_wifi_enable,
         "wifi-disable" : do_wifi_disable,
         "info" : do_info,
-        "timeformat" : do_timeformat,
-        "sync-up" : do_sync_upload,
-        "sync-down" : do_sync_download
+        "timeformat" : do_timeformat
     }
 
     def build_parser():
