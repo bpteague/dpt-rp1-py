@@ -2,7 +2,6 @@ import argparse
 import sys
 import json
 import os
-from datetime import datetime
 import logging
 
 from dptrp1.api import DigitalPaper
