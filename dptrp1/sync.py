@@ -3,6 +3,8 @@ import sys
 import json
 import os
 import logging
+import pickle
+import pathlib
 
 from dptrp1.api import DigitalPaper
 
@@ -28,7 +30,9 @@ def main():
                        help = "Local directory")
         p.add_argument('--remote',
                        help = "Remote directory")
-
+        p.add_argument('--force',
+                       action = 'store_true',
+                       help = "Force sync with different directories than was saved in the database")
         return p
 
 
@@ -50,6 +54,53 @@ def main():
     # copy the files from the empty dir into the non-empty dir,
     # then track as per: 
     # https://ianhowson.com/blog/file-synchronisation-algorithms/
+    
+    if os.path.exists(args.database):
+        try:
+            with open(args.database, 'rb') as f:
+                local_dir, local_db, remote_dir, remote_db = pickle.load(f)
+        except Exception as e:
+            raise RuntimeError("Could not load database {}".format(args.database)) from e
+        
+        if local_dir != args.local and not args.force:
+            raise RuntimeError('local directory was {}, but database is for {}'
+                               .format(args.local, local_dir))
+            
+        if remote_dir != args.remote and not args.force:
+            raise RuntimeError('remote directory was {}, but database is for {}'
+                               .format(args.remote, remote_dir))
+    else:
+        local_dir = args.local
+        remote_dir = args.remote
+        
+        if not os.path.isdir(local_dir):
+            raise RuntimeError("{} must be a directory".format(local_dir))
+            
+        local_files = os.listdir(path = local_dir)
+        
+        try:
+            remote_folder_info = dp.resolve(remote_dir)
+        except Exception as e:
+            raise RuntimeError("{} does not exist on the remote device"
+                               .format(remote_dir)) from e
+                               
+        remote_folder_id = remote_folder_info['entry_id']
+        remote_files = [d['entry_path'] for d in dp.list_documents() if d['parent_folder_id'] == remote_folder_id]
+        
+        if len(local_files) > 0 and len(remote_files) > 0:
+            raise RuntimeError("When setting up a new database, one of the folders must be empty.")
+        
+        local_db = {}
+        remote_db = {}
+            
+    # walk the local files
+    for p in pathlib.Path(local_dir).iterdir():
+        if p not in local_db:
+            pass
+            
+            
+        
+        
     
 
 if __name__ == "__main__":

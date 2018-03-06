@@ -4,7 +4,7 @@ Created on Feb 24, 2018
 @author: brian
 '''
 
-import logging, os, pickle, threading, traceback
+import logging, os, pickle, threading, traceback, sys
 
 from envisage.ui.tasks.api import TasksApplication
 from envisage.ui.tasks.tasks_application import TasksApplicationState
