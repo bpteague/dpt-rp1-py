@@ -10,6 +10,7 @@ import logging
 import re
 
 from dptrp1.dptrp1 import DigitalPaper
+from dptrp1.sync import sync
 
 def do_screenshot(d, filename):
     try:
@@ -186,6 +187,9 @@ def do_info(d):
 
 def do_timeformat(d, fmt):
     d.set_timeformat(fmt)
+    
+def do_sync(d, local_path):
+    sync(d, local_path)
 
 def main():
     
@@ -214,6 +218,7 @@ def main():
         "wifi-disable" : do_wifi_disable,
         "timeformat" : do_timeformat,
         "device-info" : do_info,
+        "sync" : do_sync,
         "register" : None
     }
 
